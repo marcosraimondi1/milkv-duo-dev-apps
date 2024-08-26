@@ -1,5 +1,5 @@
 # Milkv Duo Application Development Setup
-Userspace application that run on embedded linux for milkv duo boards.
+Userspace applications that run on embedded linux for milkv duo boards.
 
 ## Build
 1. Clone the repo:
@@ -27,4 +27,4 @@ ssh root@192.168.42.1
 ```
 
 ## Note
-Read each app README.md for additional configuration.
+Read each app README.md for additional configuration. Some of them are meant to interact with custom kernel modules, you can find them on this repository [marcosraimondi1/milkv-duo-modules](https://github.com/marcosraimondi1/milkv-duo-dev-modules).
