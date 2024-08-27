@@ -24,7 +24,12 @@ int main()
 	struct iovec iov;
 	int sock_fd, rc;
 	struct timeval start, end;
-	char send_buff[MESSAGE_SIZE] = {'a'};
+	char send_buff[MESSAGE_SIZE];
+
+	for (int i = 0; i < MESSAGE_SIZE; i++) {
+		send_buff[i] = 'a';
+	}
+	send_buff[MESSAGE_SIZE - 1] = '\0';
 
 	sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_TEST);
 	if (sock_fd < 0) {
@@ -48,7 +53,7 @@ int main()
 	dest_addr.nl_groups = 0;
 
 	printf("\n------------------- TEST -------------------\n");
-	printf("Size: %d bytes - \n", MESSAGE_SIZE);
+	printf("Size: %d bytes\n", MESSAGE_SIZE);
 	printf("Number of messages: %d\n", NUM_MESSAGES);
 
 	nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MESSAGE_SIZE));
@@ -91,10 +96,28 @@ int main()
 
 		total_time_secs += elapsed_secs(start, end);
 
-		memset(send_buff, 'a', MESSAGE_SIZE - 1);
+		// print received message
+		char *recv_msg = (char *)NLMSG_DATA(nlh);
+
+		// received len
+		int recv_len = nlh->nlmsg_len - NLMSG_HDRLEN;
+
+		// compare received message with sent message
+		if (recv_len != MESSAGE_SIZE || memcmp(send_buff, recv_msg, MESSAGE_SIZE) != 0) {
+			printf("Error: received message is different from sent message\n");
+			printf("Received: %s of len %d\n", recv_msg, recv_len);
+			close(sock_fd);
+			return 1;
+		}
+
+		for (int i = 0; i < MESSAGE_SIZE; i++) {
+			send_buff[i] = 'a';
+		}
 		send_buff[MESSAGE_SIZE - 1] = '\0';
 		strcpy(NLMSG_DATA(nlh), send_buff);
 		nlh->nlmsg_pid = getpid();
+		nlh->nlmsg_len = NLMSG_SPACE(MESSAGE_SIZE);
+		nlh->nlmsg_flags = 0;
 
 		print_loading_bar((j + 1) * LOADING_BAR_LENGTH / NUM_MESSAGES);
 	}
