@@ -1,0 +1,3 @@
+rpmsg_char_simple
+*.o
+.venv
