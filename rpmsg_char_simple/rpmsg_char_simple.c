@@ -1,39 +1,3 @@
-/*
- * rpmsg_char_simple.c
- *
- * Simple Example application using rpmsg-char library
- *
- * Copyright (c) 2020 Texas Instruments Incorporated - https://www.ti.com
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * *  Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * *  Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * *  Neither the name of Texas Instruments Incorporated nor the names of
- *    its contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- */
-
 #include <sys/select.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -49,49 +13,46 @@
 #include <time.h>
 #include <stdbool.h>
 #include <semaphore.h>
-
 #include <linux/rpmsg.h>
+#include <sys/socket.h>
+#include <linux/netlink.h>
+#include <errno.h>
+
+#define NETLINK_ID 17
 
 #define NUM_ITERATIONS 100
-
 /*
  * This test can measure round-trip latencies up to 20 ms
  * Latencies measured in microseconds (us)
  */
-#define LATENCY_RANGE 20000
+#define LATENCY_RANGE  20000
 
 /* message size options */
-#define RPMSG_BUFFER_SIZE 4096
+#define RPMSG_BUFFER_SIZE 128 // as defined in the kernel (includes header)
 enum test_msg_size {
-	MSG_SIZE_MIN = 5,
-	MSG_SIZE_NORMAL = 65,
-	MSG_SIZE_MAX = RPMSG_BUFFER_SIZE - 16 + 1,
+	MSG_SIZE_MIN = 4,
+	MSG_SIZE_NORMAL = 64,
+	MSG_SIZE_MAX = RPMSG_BUFFER_SIZE - 16, // 16 bytes of header
 };
+
+struct sockaddr_nl src_addr, dest_addr;
+struct nlmsghdr *nlh_send, *nlh_recv;
 
 int rpmsg_init(void);
 int rpmsg_exit(int fd);
-int send_msg(int fd, char *msg, int len);
-int recv_msg(int fd, int len, char *reply_msg, int *reply_len);
-int rpmsg_char_ping(char *dev_name, int num_msgs, enum test_msg_size msg_size);
-
-void usage()
-{
-	printf("Usage: rpmsg_char_simple [-n <num_msgs>] [-d <rpmsg_dev_name>] [-s <msg_size>] \n");
-	printf("\t\tDefaults: num_msgs: %d rpmsg_dev_name: /dev/ttyRPMSG0 msg_size: normal (min, "
-	       "max)\n",
-	       NUM_ITERATIONS);
-}
+int send_msg_netlink(int fd, struct nlmsghdr *nlh, struct sockaddr_nl dest_addr);
+int recv_msg_netlink(int fd, struct nlmsghdr *nlh, int len);
+int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size);
+void usage(void);
 
 int main(int argc, char *argv[])
 {
 	int ret, status, c;
 	int num_msgs = NUM_ITERATIONS;
-	char default_dev_name[] = "/dev/ttyRPMSG0";
-	char *dev_name = default_dev_name;
 	enum test_msg_size msg_size = MSG_SIZE_NORMAL;
 
 	while (1) {
-		c = getopt(argc, argv, "n:d:s:");
+		c = getopt(argc, argv, "n:s:");
 		if (c == -1) {
 			break;
 		}
@@ -109,16 +70,13 @@ int main(int argc, char *argv[])
 		case 'n':
 			num_msgs = atoi(optarg);
 			break;
-		case 'd':
-			dev_name = optarg;
-			break;
 		default:
 			usage();
 			exit(0);
 		}
 	}
 
-	status = rpmsg_char_ping(dev_name, num_msgs, msg_size);
+	status = rpmsg_char_ping(num_msgs, msg_size);
 
 	if (status < 0) {
 		printf("TEST STATUS: FAILED\n");
@@ -130,12 +88,11 @@ int main(int argc, char *argv[])
 }
 
 /* single thread communicating with a single endpoint */
-int rpmsg_char_ping(char *dev_name, int num_msgs, enum test_msg_size msg_size)
+int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size)
 {
 	int ret = 0;
 	int i = 0;
 	int packet_len;
-	int packet_recv_len;
 	int flags = 0;
 	/*
 	 * Each RPMsg packet can have up to 496 bytes of data:
@@ -169,6 +126,7 @@ int rpmsg_char_ping(char *dev_name, int num_msgs, enum test_msg_size msg_size)
 
 	memset(packet_send_buf, 0, sizeof(packet_send_buf));
 
+	// snprintf adds null terminator to the end of the string
 	snprintf(packet_send_buf, msg_size,
 		 "01234567890123456789012345678901234567890123456789012345678901234567890123"
 		 "45678901234567890123456789012345678901234567890123456789012345678901234567"
@@ -226,10 +184,14 @@ int rpmsg_char_ping(char *dev_name, int num_msgs, enum test_msg_size msg_size)
 		 "23456789012345678901234567890123456789012345678901234567890123456789012345"
 		 "67890123456789012345678901234567890123456789012345678901234567890123456789"
 		 "0123456789");
-	packet_len = strlen(packet_send_buf);
+
+	// strlen does not include null terminator
+	packet_len = strlen(packet_send_buf) + 1;
+	strcpy(NLMSG_DATA(nlh_send), packet_send_buf);
+	nlh_send->nlmsg_len = NLMSG_SPACE(packet_len);
 
 	/* double-check: is packet_len changing, or fixed at 496? */
-	printf("packet_len = %d\n", packet_len);
+	// printf("packet_len = %d\n", packet_len);
 
 	/* remove prints to speed up the test execution time */
 	// printf("Sending message #%d: %s\n", i, packet_buf);
@@ -240,20 +202,20 @@ int rpmsg_char_ping(char *dev_name, int num_msgs, enum test_msg_size msg_size)
 	for (i = 0; i < num_msgs; i++) {
 
 		clock_gettime(CLOCK_MONOTONIC, &ts_current);
-		ret = send_msg(fd, (char *)packet_send_buf, packet_len);
+		ret = send_msg_netlink(fd, nlh_send, dest_addr);
 		if (ret < 0) {
 			printf("send_msg failed for iteration %d, ret = %d\n", i, ret);
 			goto out;
 		}
 
-		ret = recv_msg(fd, packet_len, (char *)packet_recv_buf, &packet_recv_len);
+		ret = recv_msg_netlink(fd, nlh_recv, packet_len);
 		if (ret < 0) {
 			printf("recv_msg failed for iteration %d, ret = %d\n", i, ret);
 			goto out;
 		}
-		if (packet_recv_len != packet_len) {
+		if (ret != packet_len) {
 			printf("bytes written does not match received, sent = %d, recv = %d\n",
-			       packet_len, packet_recv_len);
+			       packet_len, ret);
 			printf("packet_send_buf = %s\n", packet_send_buf);
 			printf("packet_recv_buf = %s\n", packet_recv_buf);
 			goto out;
@@ -307,7 +269,7 @@ int rpmsg_char_ping(char *dev_name, int num_msgs, enum test_msg_size msg_size)
 	}
 	fclose(file_ptr);
 
-	printf("\nCommunicated %d messages successfully on %s\n\n", num_msgs, dev_name);
+	printf("\nCommunicated %d messages successfully\n\n", num_msgs);
 	printf("Total execution time for the test: %ld seconds\n",
 	       ts_end_test.tv_sec - ts_start_test.tv_sec);
 	printf("Average round-trip latency: %f [us]\n", latency_average);
@@ -318,6 +280,84 @@ out:
 	rpmsg_exit(fd);
 
 	return ret;
+}
+
+int rpmsg_init()
+{
+	int sock_fd;
+
+	// Create netlink socket
+	sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_ID);
+	if (sock_fd < 0) {
+		printf("socket: %s\n", strerror(errno));
+		return -1;
+	}
+
+	// Bind socket
+	memset(&src_addr, 0, sizeof(src_addr));
+	src_addr.nl_family = AF_NETLINK;
+	src_addr.nl_pid = getpid();
+	if (bind(sock_fd, (struct sockaddr *)&src_addr, sizeof(src_addr)) != 0) {
+		printf("bind: %s\n", strerror(errno));
+		close(sock_fd);
+		return -1;
+	}
+
+	// Set destination address
+	memset(&dest_addr, 0, sizeof(dest_addr));
+	dest_addr.nl_family = AF_NETLINK;
+	dest_addr.nl_pid = 0; // For Linux Kernel
+
+	// Allocate netlink message header
+	nlh_send = (struct nlmsghdr *)malloc(NLMSG_SPACE(MSG_SIZE_MAX));
+	nlh_recv = (struct nlmsghdr *)malloc(NLMSG_SPACE(MSG_SIZE_MAX));
+
+	return sock_fd;
+}
+
+int rpmsg_exit(int fd)
+{
+	free(nlh_send);
+	free(nlh_recv);
+	close(fd);
+	return 0;
+}
+
+int send_msg_netlink(int fd, struct nlmsghdr *nlh, struct sockaddr_nl dest_addr)
+{
+	int ret;
+	nlh->nlmsg_pid = getpid();
+
+	ret = sendto(fd, nlh, nlh->nlmsg_len, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+
+	if (ret < 0) {
+		printf("sendto(): %s\n", strerror(errno));
+		close(fd);
+		return -1;
+	}
+	return 0;
+}
+
+int recv_msg_netlink(int fd, struct nlmsghdr *nlh, int len)
+{
+	int ret, reply_len;
+
+	nlh->nlmsg_len = NLMSG_SPACE(len);
+	ret = recvfrom(fd, nlh_recv, nlh_recv->nlmsg_len, 0, NULL, NULL);
+	if (ret < 0) {
+		printf("recvfrom(): %s\n", strerror(errno));
+		close(fd);
+		return -1;
+	}
+
+	reply_len = ret - NLMSG_HDRLEN;
+	return reply_len;
+}
+
+void usage()
+{
+	printf("Usage: rpmsg_char_simple [-n <num_msgs>] [-s <msg_size>] \n");
+	printf("\t\tDefaults: num_msgs: %d msg_size: normal (min, max)\n", NUM_ITERATIONS);
 }
 
 // #define USE_RPMSG_TTY
@@ -369,89 +409,6 @@ int recv_msg(int fd, int len, char *reply_msg, int *reply_len)
 int rpmsg_exit(int fd)
 {
 	close(fd);
-	return 0;
-}
-
-#else
-#include <sys/socket.h>
-#include <linux/netlink.h>
-#include <errno.h>
-#define NETLINK_ID 17
-struct sockaddr_nl src_addr, dest_addr;
-struct nlmsghdr *nlh_send, *nlh_recv;
-
-int rpmsg_init()
-{
-	int sock_fd;
-
-	// Create netlink socket
-	sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_ID);
-	if (sock_fd < 0) {
-		printf("socket: %s\n", strerror(errno));
-		return -1;
-	}
-
-	// Bind socket
-	memset(&src_addr, 0, sizeof(src_addr));
-	src_addr.nl_family = AF_NETLINK;
-	src_addr.nl_pid = getpid();
-	if (bind(sock_fd, (struct sockaddr *)&src_addr, sizeof(src_addr)) != 0) {
-		printf("bind: %s\n", strerror(errno));
-		close(sock_fd);
-		return -1;
-	}
-
-	// Set destination address
-	memset(&dest_addr, 0, sizeof(dest_addr));
-	dest_addr.nl_family = AF_NETLINK;
-	dest_addr.nl_pid = 0; // For Linux Kernel
-
-	// Allocate netlink message header
-	nlh_send = (struct nlmsghdr *)malloc(NLMSG_SPACE(MSG_SIZE_MAX));
-	nlh_recv = (struct nlmsghdr *)malloc(NLMSG_SPACE(MSG_SIZE_MAX));
-
-	return sock_fd;
-}
-
-int rpmsg_exit(int fd)
-{
-	free(nlh_send);
-	free(nlh_recv);
-	close(fd);
-	return 0;
-}
-
-int send_msg(int fd, char *msg, int len)
-{
-	int ret;
-	strcpy(NLMSG_DATA(nlh_send), msg); // this adds latency
-	nlh_send->nlmsg_len = NLMSG_SPACE(len);
-	nlh_send->nlmsg_pid = getpid();
-
-	ret = sendto(fd, nlh_send, nlh_send->nlmsg_len, 0, (struct sockaddr *)&dest_addr,
-		     sizeof(dest_addr));
-	if (ret < 0) {
-		printf("sendto(): %s\n", strerror(errno));
-		close(fd);
-		return -1;
-	}
-	return 0;
-}
-
-int recv_msg(int fd, int len, char *reply_msg, int *reply_len)
-{
-	int ret;
-	nlh_recv->nlmsg_len = NLMSG_SPACE(len);
-	ret = recvfrom(fd, nlh_recv, nlh_recv->nlmsg_len, 0, NULL, NULL);
-	if (ret < 0) {
-		printf("recvfrom(): %s\n", strerror(errno));
-		close(fd);
-		return -1;
-	}
-
-	char *msg = (char *)NLMSG_DATA(nlh_recv);
-	*reply_len = ret - NLMSG_HDRLEN;
-	memcpy(reply_msg, msg, *reply_len); // this adds latency
 	return 0;
 }
 
