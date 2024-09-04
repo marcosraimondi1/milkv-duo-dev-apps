@@ -18,6 +18,7 @@
 #include <linux/netlink.h>
 #include <errno.h>
 
+#define USE_NETLINK
 #define NETLINK_ID 17
 
 #define NUM_ITERATIONS 100
@@ -28,7 +29,7 @@
 #define LATENCY_RANGE  20000
 
 /* message size options */
-#define RPMSG_BUFFER_SIZE 128 // as defined in the kernel (includes header)
+#define RPMSG_BUFFER_SIZE 512 // as defined in the kernel (includes header)
 enum test_msg_size {
 	MSG_SIZE_MIN = 4,
 	MSG_SIZE_NORMAL = 64,
@@ -38,10 +39,16 @@ enum test_msg_size {
 struct sockaddr_nl src_addr, dest_addr;
 struct nlmsghdr *nlh_send, *nlh_recv;
 
-int rpmsg_init(void);
-int rpmsg_exit(int fd);
+int rpmsg_init_netlink(void);
+int rpmsg_exit_netlink(int fd);
 int send_msg_netlink(int fd, struct nlmsghdr *nlh, struct sockaddr_nl dest_addr);
 int recv_msg_netlink(int fd, struct nlmsghdr *nlh, int len);
+
+int rpmsg_init_tty(void);
+int rpmsg_exit_tty(int fd);
+int send_msg_tty(int fd, char *msg, int len);
+int recv_msg_tty(int fd, int len, char *reply_msg);
+
 int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size);
 void usage(void);
 
@@ -117,7 +124,11 @@ int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size)
 		0; /* try double, since long long might have overflowed w/ 1Billion+ iterations */
 	FILE *file_ptr;
 
-	int fd = rpmsg_init();
+#ifdef USE_NETLINK
+	int fd = rpmsg_init_netlink();
+#else
+	int fd = rpmsg_init_tty();
+#endif
 
 	if (fd < 0) {
 		printf("rpmsg_init failed\n");
@@ -187,8 +198,12 @@ int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size)
 
 	// strlen does not include null terminator
 	packet_len = strlen(packet_send_buf) + 1;
+
+#ifdef USE_NETLINK
 	strcpy(NLMSG_DATA(nlh_send), packet_send_buf);
 	nlh_send->nlmsg_len = NLMSG_SPACE(packet_len);
+#else
+#endif
 
 	/* double-check: is packet_len changing, or fixed at 496? */
 	// printf("packet_len = %d\n", packet_len);
@@ -202,13 +217,22 @@ int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size)
 	for (i = 0; i < num_msgs; i++) {
 
 		clock_gettime(CLOCK_MONOTONIC, &ts_current);
+
+#ifdef USE_NETLINK
 		ret = send_msg_netlink(fd, nlh_send, dest_addr);
+#else
+		ret = send_msg_tty(fd, packet_send_buf, packet_len);
+#endif
 		if (ret < 0) {
 			printf("send_msg failed for iteration %d, ret = %d\n", i, ret);
 			goto out;
 		}
 
+#ifdef USE_NETLINK
 		ret = recv_msg_netlink(fd, nlh_recv, packet_len);
+#else
+		ret = recv_msg_tty(fd, packet_len, packet_recv_buf);
+#endif
 		if (ret < 0) {
 			printf("recv_msg failed for iteration %d, ret = %d\n", i, ret);
 			goto out;
@@ -277,12 +301,15 @@ int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size)
 	printf("Histogram data at histogram.txt\n");
 
 out:
-	rpmsg_exit(fd);
-
+#ifdef USE_NETLINK
+	rpmsg_exit_netlink(fd);
+#else
+	rpmsg_exit_tty(fd);
+#endif
 	return ret;
 }
 
-int rpmsg_init()
+int rpmsg_init_netlink()
 {
 	int sock_fd;
 
@@ -315,7 +342,7 @@ int rpmsg_init()
 	return sock_fd;
 }
 
-int rpmsg_exit(int fd)
+int rpmsg_exit_netlink(int fd)
 {
 	free(nlh_send);
 	free(nlh_recv);
@@ -360,15 +387,8 @@ void usage()
 	printf("\t\tDefaults: num_msgs: %d msg_size: normal (min, max)\n", NUM_ITERATIONS);
 }
 
-// #define USE_RPMSG_TTY
-#ifdef USE_RPMSG_TTY
-int rpmsg_init()
+int rpmsg_init_tty()
 {
-	/*
-	 * Open the remote rpmsg device identified by dev_name and bind the
-	 * device to a local end-point used for receiving messages from
-	 * remote processor
-	 */
 	int fd = open("/dev/ttyRPMSG0", O_RDWR);
 	if (fd < 0) {
 		perror("Can't open rpmsg endpt device\n");
@@ -377,7 +397,7 @@ int rpmsg_init()
 	return fd;
 }
 
-int send_msg(int fd, char *msg, int len)
+int send_msg_tty(int fd, char *msg, int len)
 {
 	int ret = 0;
 
@@ -390,7 +410,7 @@ int send_msg(int fd, char *msg, int len)
 	return ret;
 }
 
-int recv_msg(int fd, int len, char *reply_msg, int *reply_len)
+int recv_msg_tty(int fd, int len, char *reply_msg)
 {
 	int ret = 0;
 
@@ -399,17 +419,13 @@ int recv_msg(int fd, int len, char *reply_msg, int *reply_len)
 	if (ret < 0) {
 		perror("Can't read from rpmsg endpt device\n");
 		return -1;
-	} else {
-		*reply_len = ret;
 	}
 
-	return 0;
+	return ret;
 }
 
-int rpmsg_exit(int fd)
+int rpmsg_exit_tty(int fd)
 {
 	close(fd);
 	return 0;
 }
-
-#endif
