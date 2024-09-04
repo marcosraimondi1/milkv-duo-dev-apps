@@ -1,4 +1,4 @@
-#!/home/marcos/facu/tesis/dev/apps/rpmsg_char_simple/histograms/.venv/bin/python
+#!/usr/bin/python
 import matplotlib.pyplot as plt
 import argparse
 
@@ -32,7 +32,7 @@ print("Data read successfully.")
 
 # Plotting the histogram
 plt.figure(figsize=(10, 6))
-plt.bar(latencies, repetitions, color='skyblue', edgecolor='black')
+plt.stem(latencies, repetitions)
 plt.xlabel('Latency (µs)')
 plt.ylabel('Repetitions')
 plt.title('Latency Histogram `' + args.filename + '`')
