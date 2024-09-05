@@ -28,6 +28,7 @@ for subdir, _, files in os.walk(data_dir):
                 # Obtener el tamaño de payload y número de mensajes del nombre del archivo
                 payload_size = file.split('-')[0].split('_')[1]
                 nmsg = file.split('-')[1].split('_')[1].split('.')[0]
+                is_stressed = 'stressed' in file
                 
                 # Leer los datos del archivo
                 latencies = []
@@ -70,7 +71,7 @@ for subdir, _, files in os.walk(data_dir):
                 plt.stem(latencies, repetitions)
                 plt.xlabel('Latency (µs)')
                 plt.ylabel('Repetitions')
-                plt.title(f'Latency Histogram {file}')
+                plt.title(f'Latency Histogram {test_id} - {file}')
                 plt.grid(axis='y', linestyle='--', alpha=0.7)
                 plt.xticks(range(0, max(latencies) + 1, 50))  # Ajustar x-ticks si es necesario
                 plt.xlim(avg_latency - 200, avg_latency + 200)
@@ -87,13 +88,13 @@ for subdir, _, files in os.walk(data_dir):
 
                 # Agregar resultados a la lista
                 bsize_int = bsize.split('e')[1]
-                results.append([test_id, '', bsize_int, payload_size, nmsg, avg_latency, max_latency, min_latency])
+                results.append([test_id, file, bsize_int, payload_size, nmsg, avg_latency, max_latency, min_latency, 'Yes' if is_stressed else 'No'])
                 test_id += 1
 
 # Guardar los resultados en un archivo CSV
 with open(csv_output, 'w', newline='') as csvfile:
     csvwriter = csv.writer(csvfile)
-    csvwriter.writerow(['Test ID', 'Title', 'BSize', 'PayloadSize', 'NMsg', 'Avg Latency [µs]', 'Max Latency [µs]', 'Min Latency [µs]'])
+    csvwriter.writerow(['Test ID', 'Title', 'BSize', 'PayloadSize', 'NMsg', 'Avg Latency [µs]', 'Max Latency [µs]', 'Min Latency [µs]', 'Stressed'])
     csvwriter.writerows(results)
 
 print(f"Procesamiento completado. Resultados guardados en '{csv_output}'.")
