@@ -17,24 +17,20 @@
 #include <sys/socket.h>
 #include <linux/netlink.h>
 #include <errno.h>
+#include "payload.h"
 
-#define USE_NETLINK
 #define NETLINK_ID 17
 
-#define NUM_ITERATIONS 100
+#define NUM_ITERATIONS_DEFAULT 100
 /*
  * This test can measure round-trip latencies up to 20 ms
  * Latencies measured in microseconds (us)
  */
-#define LATENCY_RANGE  20000
+#define LATENCY_RANGE          20000
 
 /* message size options */
 #define RPMSG_BUFFER_SIZE 512 // as defined in the kernel (includes header)
-enum test_msg_size {
-	MSG_SIZE_MIN = 4,
-	MSG_SIZE_NORMAL = 64,
-	MSG_SIZE_MAX = RPMSG_BUFFER_SIZE - 16, // 16 bytes of header
-};
+#define MSG_SIZE_DEFAULT  (RPMSG_BUFFER_SIZE - 16)
 
 struct sockaddr_nl src_addr, dest_addr;
 struct nlmsghdr *nlh_send, *nlh_recv;
@@ -44,19 +40,16 @@ int rpmsg_exit_netlink(int fd);
 int send_msg_netlink(int fd, struct nlmsghdr *nlh, struct sockaddr_nl dest_addr);
 int recv_msg_netlink(int fd, struct nlmsghdr *nlh, int len);
 
-int rpmsg_init_tty(void);
-int rpmsg_exit_tty(int fd);
-int send_msg_tty(int fd, char *msg, int len);
-int recv_msg_tty(int fd, int len, char *reply_msg);
+int rpmsg_char_ping(int num_msgs, int msg_size);
 
-int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size);
+int check_payload(const char *sent, const char *recv, int packet_len);
 void usage(void);
 
 int main(int argc, char *argv[])
 {
 	int ret, status, c;
-	int num_msgs = NUM_ITERATIONS;
-	enum test_msg_size msg_size = MSG_SIZE_NORMAL;
+	int num_msgs = NUM_ITERATIONS_DEFAULT;
+	int msg_size = MSG_SIZE_DEFAULT;
 
 	while (1) {
 		c = getopt(argc, argv, "n:s:");
@@ -66,13 +59,7 @@ int main(int argc, char *argv[])
 
 		switch (c) {
 		case 's':
-			if (strcmp(optarg, "min") == 0) {
-				msg_size = MSG_SIZE_MIN;
-			} else if (strcmp(optarg, "max") == 0) {
-				msg_size = MSG_SIZE_MAX;
-			} else {
-				msg_size = MSG_SIZE_NORMAL;
-			}
+			msg_size = atoi(optarg);
 			break;
 		case 'n':
 			num_msgs = atoi(optarg);
@@ -95,7 +82,7 @@ int main(int argc, char *argv[])
 }
 
 /* single thread communicating with a single endpoint */
-int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size)
+int rpmsg_char_ping(int num_msgs, int msg_size)
 {
 	int ret = 0;
 	int i = 0;
@@ -105,8 +92,8 @@ int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size)
 	 * Each RPMsg packet can have up to 496 bytes of data:
 	 * 512 bytes total - 16 byte header = 496
 	 */
-	char packet_send_buf[MSG_SIZE_MAX] = {0};
-	char packet_recv_buf[MSG_SIZE_MAX] = {0};
+	char packet_send_buf[msg_size];
+	char *packet_recv_buf;
 
 	/*
 	 * Variables used for latency benchmarks
@@ -124,11 +111,7 @@ int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size)
 		0; /* try double, since long long might have overflowed w/ 1Billion+ iterations */
 	FILE *file_ptr;
 
-#ifdef USE_NETLINK
 	int fd = rpmsg_init_netlink();
-#else
-	int fd = rpmsg_init_tty();
-#endif
 
 	if (fd < 0) {
 		printf("rpmsg_init failed\n");
@@ -138,78 +121,32 @@ int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size)
 	memset(packet_send_buf, 0, sizeof(packet_send_buf));
 
 	// snprintf adds null terminator to the end of the string
-	snprintf(packet_send_buf, msg_size,
-		 "01234567890123456789012345678901234567890123456789012345678901234567890123"
-		 "45678901234567890123456789012345678901234567890123456789012345678901234567"
-		 "89012345678901234567890123456789012345678901234567890123456789012345678901"
-		 "23456789012345678901234567890123456789012345678901234567890123456789012345"
-		 "67890123456789012345678901234567890123456789012345678901234567890123456789"
-		 "01234567890123456789012345678901234567890123456789012345678901234567890123"
-		 "45678901234567890123456789012345678901234567890123456789012345678901234567"
-		 "89012345678901234567890123456789012345678901234567890123456789012345678901"
-		 "23456789012345678901234567890123456789012345678901234567890123456789012345"
-		 "67890123456789012345678901234567890123456789012345678901234567890123456789"
-		 "01234567890123456789012345678901234567890123456789012345678901234567890123"
-		 "45678901234567890123456789012345678901234567890123456789012345678901234567"
-		 "89012345678901234567890123456789012345678901234567890123456789012345678901"
-		 "23456789012345678901234567890123456789012345678901234567890123456789012345"
-		 "67890123456789012345678901234567890123456789012345678901234567890123456789"
-		 "01234567890123456789012345678901234567890123456789012345678901234567890123"
-		 "45678901234567890123456789012345678901234567890123456789012345678901234567"
-		 "89012345678901234567890123456789012345678901234567890123456789012345678901"
-		 "23456789012345678901234567890123456789012345678901234567890123456789012345"
-		 "67890123456789012345678901234567890123456789012345678901234567890123456789"
-		 "01234567890123456789012345678901234567890123456789012345678901234567890123"
-		 "45678901234567890123456789012345678901234567890123456789012345678901234567"
-		 "89012345678901234567890123456789012345678901234567890123456789012345678901"
-		 "23456789012345678901234567890123456789012345678901234567890123456789012345"
-		 "67890123456789012345678901234567890123456789012345678901234567890123456789"
-		 "01234567890123456789012345678901234567890123456789012345678901234567890123"
-		 "45678901234567890123456789012345678901234567890123456789012345678901234567"
-		 "89012345678901234567890123456789012345678901234567890123456789012345678901"
-		 "23456789012345678901234567890123456789012345678901234567890123456789012345"
-		 "67890123456789012345678901234567890123456789012345678901234567890123456789"
-		 "01234567890123456789012345678901234567890123456789012345678901234567890123"
-		 "45678901234567890123456789012345678901234567890123456789012345678901234567"
-		 "89012345678901234567890123456789012345678901234567890123456789012345678901"
-		 "23456789012345678901234567890123456789012345678901234567890123456789012345"
-		 "67890123456789012345678901234567890123456789012345678901234567890123456789"
-		 "01234567890123456789012345678901234567890123456789012345678901234567890123"
-		 "45678901234567890123456789012345678901234567890123456789012345678901234567"
-		 "89012345678901234567890123456789012345678901234567890123456789012345678901"
-		 "23456789012345678901234567890123456789012345678901234567890123456789012345"
-		 "67890123456789012345678901234567890123456789012345678901234567890123456789"
-		 "01234567890123456789012345678901234567890123456789012345678901234567890123"
-		 "45678901234567890123456789012345678901234567890123456789012345678901234567"
-		 "89012345678901234567890123456789012345678901234567890123456789012345678901"
-		 "23456789012345678901234567890123456789012345678901234567890123456789012345"
-		 "67890123456789012345678901234567890123456789012345678901234567890123456789"
-		 "01234567890123456789012345678901234567890123456789012345678901234567890123"
-		 "45678901234567890123456789012345678901234567890123456789012345678901234567"
-		 "89012345678901234567890123456789012345678901234567890123456789012345678901"
-		 "23456789012345678901234567890123456789012345678901234567890123456789012345"
-		 "67890123456789012345678901234567890123456789012345678901234567890123456789"
-		 "01234567890123456789012345678901234567890123456789012345678901234567890123"
-		 "45678901234567890123456789012345678901234567890123456789012345678901234567"
-		 "89012345678901234567890123456789012345678901234567890123456789012345678901"
-		 "23456789012345678901234567890123456789012345678901234567890123456789012345"
-		 "67890123456789012345678901234567890123456789012345678901234567890123456789"
-		 "0123456789");
+	snprintf(packet_send_buf, msg_size, STRING_PAYLOAD);
 
 	// strlen does not include null terminator
 	packet_len = strlen(packet_send_buf) + 1;
+	if (packet_len != msg_size) {
+		printf("Payload size is different to packet_len\n");
+		return -1;
+	}
 
-#ifdef USE_NETLINK
+	// send init test
+	strcpy(NLMSG_DATA(nlh_send), "init");
+	nlh_send->nlmsg_len = NLMSG_SPACE(5);
+	ret = send_msg_netlink(fd, nlh_send, dest_addr);
+	if (ret < 0) {
+		printf("send_msg failed for start, ret = %d\n", i);
+		goto out;
+	}
+
 	strcpy(NLMSG_DATA(nlh_send), packet_send_buf);
 	nlh_send->nlmsg_len = NLMSG_SPACE(packet_len);
-#else
-#endif
 
 	/* double-check: is packet_len changing, or fixed at 496? */
 	// printf("packet_len = %d\n", packet_len);
 
 	/* remove prints to speed up the test execution time */
-	// printf("Sending message #%d: %s\n", i, packet_buf);
+	// printf("Sending message #%d: %s\n", i, packet_send_buf);
 
 	printf("Starting test with %d messages of size %d bytes\n", num_msgs, packet_len);
 
@@ -218,21 +155,14 @@ int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size)
 
 		clock_gettime(CLOCK_MONOTONIC, &ts_current);
 
-#ifdef USE_NETLINK
 		ret = send_msg_netlink(fd, nlh_send, dest_addr);
-#else
-		ret = send_msg_tty(fd, packet_send_buf, packet_len);
-#endif
 		if (ret < 0) {
 			printf("send_msg failed for iteration %d, ret = %d\n", i, ret);
 			goto out;
 		}
 
-#ifdef USE_NETLINK
 		ret = recv_msg_netlink(fd, nlh_recv, packet_len);
-#else
-		ret = recv_msg_tty(fd, packet_len, packet_recv_buf);
-#endif
+		packet_recv_buf = NLMSG_DATA(nlh_recv);
 		if (ret < 0) {
 			printf("recv_msg failed for iteration %d, ret = %d\n", i, ret);
 			goto out;
@@ -245,6 +175,11 @@ int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size)
 			goto out;
 		}
 		clock_gettime(CLOCK_MONOTONIC, &ts_end);
+
+		if (check_payload(packet_send_buf, packet_recv_buf, packet_len) < 0) {
+			ret = -1;
+			goto out;
+		}
 
 		/* latency measured in usec */
 		latency = (ts_end.tv_nsec - ts_current.tv_nsec) / 1000;
@@ -264,6 +199,15 @@ int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size)
 	}
 
 	clock_gettime(CLOCK_MONOTONIC, &ts_end_test);
+
+	// end test
+	strcpy(NLMSG_DATA(nlh_send), "end");
+	nlh_send->nlmsg_len = NLMSG_SPACE(4);
+	ret = send_msg_netlink(fd, nlh_send, dest_addr);
+	if (ret < 0) {
+		printf("send_msg failed for end, ret = %d\n", ret);
+		goto out;
+	}
 
 	/* find worst-case latency */
 	for (i = LATENCY_RANGE - 1; i > 0; i--) {
@@ -301,11 +245,7 @@ int rpmsg_char_ping(int num_msgs, enum test_msg_size msg_size)
 	printf("Histogram data at histogram.txt\n");
 
 out:
-#ifdef USE_NETLINK
 	rpmsg_exit_netlink(fd);
-#else
-	rpmsg_exit_tty(fd);
-#endif
 	return ret;
 }
 
@@ -336,8 +276,8 @@ int rpmsg_init_netlink()
 	dest_addr.nl_pid = 0; // For Linux Kernel
 
 	// Allocate netlink message header
-	nlh_send = (struct nlmsghdr *)malloc(NLMSG_SPACE(MSG_SIZE_MAX));
-	nlh_recv = (struct nlmsghdr *)malloc(NLMSG_SPACE(MSG_SIZE_MAX));
+	nlh_send = (struct nlmsghdr *)malloc(NLMSG_SPACE(RPMSG_BUFFER_SIZE - 16));
+	nlh_recv = (struct nlmsghdr *)malloc(NLMSG_SPACE(RPMSG_BUFFER_SIZE - 16));
 
 	return sock_fd;
 }
@@ -384,48 +324,17 @@ int recv_msg_netlink(int fd, struct nlmsghdr *nlh, int len)
 void usage()
 {
 	printf("Usage: rpmsg_char_simple [-n <num_msgs>] [-s <msg_size>] \n");
-	printf("\t\tDefaults: num_msgs: %d msg_size: normal (min, max)\n", NUM_ITERATIONS);
+	printf("\t\tDefaults: num_msgs: %d msg_size: %d\n", NUM_ITERATIONS_DEFAULT,
+	       MSG_SIZE_DEFAULT);
 }
 
-int rpmsg_init_tty()
+int check_payload(const char *sent, const char *recv, int packet_len)
 {
-	int fd = open("/dev/ttyRPMSG0", O_RDWR);
-	if (fd < 0) {
-		perror("Can't open rpmsg endpt device\n");
+	if (strncmp(sent, recv, packet_len) != 0) {
+		printf("Payloads do not match\n");
+		printf("Sent: %s\n", sent);
+		printf("Received: %s\n", recv);
 		return -1;
 	}
-	return fd;
-}
-
-int send_msg_tty(int fd, char *msg, int len)
-{
-	int ret = 0;
-
-	ret = write(fd, msg, len);
-	if (ret < 0) {
-		perror("Can't write to rpmsg endpt device\n");
-		return -1;
-	}
-
-	return ret;
-}
-
-int recv_msg_tty(int fd, int len, char *reply_msg)
-{
-	int ret = 0;
-
-	/* Note: len should be max length of response expected */
-	ret = read(fd, reply_msg, len);
-	if (ret < 0) {
-		perror("Can't read from rpmsg endpt device\n");
-		return -1;
-	}
-
-	return ret;
-}
-
-int rpmsg_exit_tty(int fd)
-{
-	close(fd);
 	return 0;
 }
