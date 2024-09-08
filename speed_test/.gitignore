@@ -1,3 +1,4 @@
 speed_test
 *.o
 .venv
+images

@@ -29,7 +29,7 @@
 #define LATENCY_RANGE          20000
 
 /* message size options */
-#define RPMSG_BUFFER_SIZE 512 // as defined in the kernel (includes header)
+#define RPMSG_BUFFER_SIZE 4096 // as defined in the kernel (includes header)
 #define MSG_SIZE_DEFAULT  (RPMSG_BUFFER_SIZE - 16)
 
 struct sockaddr_nl src_addr, dest_addr;

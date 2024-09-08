@@ -2,10 +2,12 @@
 import os
 import matplotlib.pyplot as plt
 import csv
+from numpy import mean, sqrt, var
 
 # Ruta del directorio de datos y salida
 data_dir = 'data'
 output_dir = 'images'
+output_subdir  = ''
 csv_output = 'test_results.csv'
 
 # Crear lista para almacenar los resultados
@@ -23,20 +25,26 @@ for subdir, _, files in os.walk(data_dir):
     if os.path.basename(subdir).startswith('bsize'):
         bsize = os.path.basename(subdir)
 
+        max_latencies = []
+        min_latencies = []
+        avg_latencies = []
+        payload_sizes = []
+
+        max_latencies_stressed = []
+        min_latencies_stressed = []
+        avg_latencies_stressed = []
+        payload_sizes_stressed = []
+
         for file in files:
             if file.endswith('.txt'):
                 # Obtener el tamaño de payload y número de mensajes del nombre del archivo
-                payload_size = file.split('-')[0].split('_')[1]
-                nmsg = file.split('-')[1].split('_')[1].split('.')[0]
+                payload_size = int(file.split('-')[0].split('_')[1])
+                nmsg = int(file.split('-')[1].split('_')[1].split('.')[0])
                 is_stressed = 'stressed' in file
-                
+
                 # Leer los datos del archivo
                 latencies = []
                 repetitions = []
-                total_latency = 0
-                total_repetitions = 0
-                max_latency = 0
-                min_latency = float('inf')
 
                 file_path = os.path.join(subdir, file)
                 try:
@@ -50,11 +58,6 @@ for subdir, _, files in os.walk(data_dir):
                             latencies.append(latency)
                             repetitions.append(repetition)
 
-                            # Calcular estadísticas
-                            total_latency += latency * repetition
-                            total_repetitions += repetition
-                            max_latency = max(max_latency, latency)
-                            min_latency = min(min_latency, latency)
                 except FileNotFoundError:
                     print(f"Error: El archivo '{file_path}' no se encontró.")
                     continue
@@ -62,19 +65,26 @@ for subdir, _, files in os.walk(data_dir):
                     print(f"Error: El archivo '{file_path}' contiene datos inválidos.")
                     continue
 
-                # Calcular promedio de latencia
-                avg_latency = total_latency / total_repetitions if total_repetitions > 0 else 0
-                avg_latency = round(avg_latency, 4)
+                # Calcular estadísticas
+                latencies_x = []
+                for i in range(len(latencies)):
+                    latencies_x += [latencies[i]] * repetitions[i] # Repito valor de latencia segun cantidad de repeticiones obtenidas
 
-                # Crear y guardar el gráfico
+                media = round(mean(latencies_x), 2)
+                sigma2 = round(var(latencies_x), 2)
+                sigma = round(sqrt(sigma2), 2)
+                max_latency = max(latencies_x)
+                min_latency = min(latencies_x)
+
+                # Crear y guardar el histograma
                 plt.figure(figsize=(10, 6))
                 plt.stem(latencies, repetitions)
                 plt.xlabel('Latency (µs)')
                 plt.ylabel('Repetitions')
-                plt.title(f'Latency Histogram {test_id} - {file}')
+                plt.title(f'Latency Histogram {test_id}: BSize {bsize} - Payload {payload_size} - NMsg {nmsg} - Sigma {sigma} µs')
                 plt.grid(axis='y', linestyle='--', alpha=0.7)
                 plt.xticks(range(0, max(latencies) + 1, 50))  # Ajustar x-ticks si es necesario
-                plt.xlim(avg_latency - 200, avg_latency + 200)
+                plt.xlim(media - 200, media + 200)
                 plt.tight_layout()
 
                 # Crear carpeta de salida específica si no existe
@@ -88,13 +98,52 @@ for subdir, _, files in os.walk(data_dir):
 
                 # Agregar resultados a la lista
                 bsize_int = bsize.split('e')[1]
-                results.append([test_id, file, bsize_int, payload_size, nmsg, avg_latency, max_latency, min_latency, 'Yes' if is_stressed else 'No'])
+                results.append([test_id, bsize_int, payload_size, nmsg, 'Yes' if is_stressed else 'No', media, max_latency, min_latency, sigma2, sigma])
                 test_id += 1
+
+                if is_stressed:
+                    max_latencies_stressed.append(max_latency)
+                    min_latencies_stressed.append(min_latency)
+                    avg_latencies_stressed.append(media)
+                    payload_sizes_stressed.append(payload_size)
+                else:
+                    max_latencies.append(max_latency)
+                    min_latencies.append(min_latency)
+                    avg_latencies.append(media)
+                    payload_sizes.append(payload_size)
+
+        # sort results (avg, max, min) by payload size
+        avg_latencies, max_latencies, min_latencies, payload_sizes = zip(*sorted(zip(avg_latencies, max_latencies, min_latencies, payload_sizes)))
+
+        # Archivos de subcarpeta procesados
+        fig, (ax1, ax2) = plt.subplots(2, 1, sharey=True, sharex=True)
+        fig.suptitle(f'Latency vs Payload Size - BSize: {bsize}')
+        ax1.set_title('Normal')
+        ax1.set_xscale('log', base=2)
+        ax1.stem(payload_sizes, avg_latencies, markerfmt='ro', linefmt='r-')
+        ax1.stem(payload_sizes, max_latencies, markerfmt='go', linefmt='g-')
+        ax1.stem(payload_sizes, min_latencies, markerfmt='bo', linefmt='b-')
+        ax1.set(ylabel='Latency (µs)')
+        ax1.grid(axis='y', linestyle='--', alpha=0.7)
+        ax1.set(xlim=(2, max(payload_sizes)*5))
+
+        if (len(payload_sizes_stressed) > 0):
+            ax2.set_title('Stressed')
+            ax2.set_xscale('log', base=2)
+            ax2.stem(payload_sizes_stressed, avg_latencies_stressed, markerfmt='ro', linefmt='r-')
+            ax2.stem(payload_sizes_stressed, max_latencies_stressed, markerfmt='go', linefmt='g-')
+            ax2.stem(payload_sizes_stressed, min_latencies_stressed, markerfmt='bo', linefmt='b-')
+            ax2.set(xlabel='Payload Size (Bytes)', ylabel='Latency (µs)')
+            ax2.legend(['Avg', 'Max', 'Min'], loc='lower right')
+            ax2.grid(axis='y', linestyle='--', alpha=0.7)
+
+        fig.savefig(os.path.join(output_subdir, "latency_vs_payload.png"))
+        plt.close(fig)
 
 # Guardar los resultados en un archivo CSV
 with open(csv_output, 'w', newline='') as csvfile:
     csvwriter = csv.writer(csvfile)
-    csvwriter.writerow(['Test ID', 'Title', 'BSize', 'PayloadSize', 'NMsg', 'Avg Latency [µs]', 'Max Latency [µs]', 'Min Latency [µs]', 'Stressed'])
+    csvwriter.writerow(['Test ID', 'BSize', 'PayloadSize', 'NMsg', 'Stressed', 'Avg Latency [µs]', 'Max Latency [µs]', 'Min Latency [µs]', 'Sigma2 [µs^2]', 'Sigma [µs]'])
     csvwriter.writerows(results)
 
 print(f"Procesamiento completado. Resultados guardados en '{csv_output}'.")
