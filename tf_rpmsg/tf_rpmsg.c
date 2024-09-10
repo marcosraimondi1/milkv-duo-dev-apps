@@ -34,61 +34,24 @@ int rpmsg_exit_netlink(int fd);
 int send_msg_netlink(int fd, struct nlmsghdr *nlh, struct sockaddr_nl dest_addr);
 int recv_msg_netlink(int fd, struct nlmsghdr *nlh, int len);
 
-int rpmsg_char_ping(int num_msgs, int msg_size);
+int run_app(void);
 
-int check_payload(const char *sent, const char *recv, int packet_len);
 void usage(void);
 
 int main(int argc, char *argv[])
 {
-	int ret, status, c;
-	int num_msgs = NUM_ITERATIONS_DEFAULT;
-	int msg_size = MSG_SIZE_DEFAULT;
-
-	while (1) {
-		c = getopt(argc, argv, "n:s:");
-		if (c == -1) {
-			break;
-		}
-
-		switch (c) {
-		case 's':
-			msg_size = atoi(optarg);
-			break;
-		case 'n':
-			num_msgs = atoi(optarg);
-			break;
-		default:
-			usage();
-			exit(0);
-		}
-	}
-
-	status = rpmsg_char_ping(num_msgs, 4);
-
+	int status = run_app();
 	if (status < 0) {
-		printf("TEST STATUS: FAILED\n");
+		printf("APP STATUS: FAILED\n");
 	} else {
-		printf("TEST STATUS: PASSED\n");
+		printf("APP STATUS: PASSED\n");
 	}
 
 	return 0;
 }
 
-/* single thread communicating with a single endpoint */
-int rpmsg_char_ping(int num_msgs, int msg_size)
+int run_app()
 {
-	int ret = 0;
-	int i = 0;
-	int packet_len;
-	int flags = 0;
-	/*
-	 * Each RPMsg packet can have up to 496 bytes of data:
-	 * 512 bytes total - 16 byte header = 496
-	 */
-	char packet_send_buf[msg_size];
-	char *packet_recv_buf;
-
 	int fd = rpmsg_init_netlink();
 
 	if (fd < 0) {
@@ -96,62 +59,36 @@ int rpmsg_char_ping(int num_msgs, int msg_size)
 		return -1;
 	}
 
-	memset(packet_send_buf, 0, sizeof(packet_send_buf));
+	float packet_send_buf[4] = {1.1, 2.2, 3.3, 4.4};
+	float *packet_recv_buf;
 
-	// snprintf adds null terminator to the end of the string
-	snprintf(packet_send_buf, msg_size, "Hello, world!");
+	int packet_len = sizeof(packet_send_buf);
 
-	// strlen does not include null terminator
-	packet_len = strlen(packet_send_buf) + 1;
-	if (packet_len != msg_size) {
-		printf("Payload size is different to packet_len\n");
-		return -1;
-	}
-
-	strcpy(NLMSG_DATA(nlh_send), packet_send_buf);
+	memcpy(NLMSG_DATA(nlh_send), packet_send_buf, sizeof(packet_send_buf));
 	nlh_send->nlmsg_len = NLMSG_SPACE(packet_len);
 
-	/* double-check: is packet_len changing, or fixed at 496? */
-	// printf("packet_len = %d\n", packet_len);
+	int ret = send_msg_netlink(fd, nlh_send, dest_addr);
+	if (ret < 0) {
+		printf("send_msg failed for iteration ret = %d\n", ret);
+		goto out;
+	}
+	ret = recv_msg_netlink(fd, nlh_recv, packet_len);
 
-	/* remove prints to speed up the test execution time */
-	// printf("Sending message #%d: %s\n", i, packet_send_buf);
-
-	printf("Starting test with %d messages of size %d bytes\n", num_msgs, packet_len);
-
-	for (i = 0; i < num_msgs; i++) {
-
-		ret = send_msg_netlink(fd, nlh_send, dest_addr);
-		if (ret < 0) {
-			printf("send_msg failed for iteration %d, ret = %d\n", i, ret);
-			goto out;
-		}
-
-		ret = recv_msg_netlink(fd, nlh_recv, packet_len);
-		packet_recv_buf = NLMSG_DATA(nlh_recv);
-		if (ret < 0) {
-			printf("recv_msg failed for iteration %d, ret = %d\n", i, ret);
-			goto out;
-		}
-		if (ret != packet_len) {
-			printf("bytes written does not match received, sent = %d, recv = %d\n",
-			       packet_len, ret);
-			printf("packet_send_buf = %s\n", packet_send_buf);
-			printf("packet_recv_buf = %s\n", packet_recv_buf);
-			goto out;
-		}
-
-		if (check_payload(packet_send_buf, packet_recv_buf, packet_len) < 0) {
-			ret = -1;
-			goto out;
-		}
-
-		/* remove prints to speed up the test execution time */
-		// printf("Received message #%d: round trip delay(usecs) = %ld\n", i,(ts_end.tv_nsec
-		// - ts_current.tv_nsec)/1000); printf("%s\n", packet_buf);
+	packet_recv_buf = NLMSG_DATA(nlh_recv);
+	if (ret < 0) {
+		printf("recv_msg failed for iteration ret = %d\n", ret);
+		goto out;
+	}
+	if (ret != packet_len) {
+		printf("bytes written does not match received, sent = %d, recv = %d\n", packet_len,
+		       ret);
+		goto out;
 	}
 
-	printf("\nCommunicated %d messages successfully\n\n", num_msgs);
+	// print results
+	for (int i = 0; i < 4; i++) {
+		printf("x: %f, y: %f\n", packet_send_buf[i], packet_recv_buf[i]);
+	}
 
 out:
 	rpmsg_exit_netlink(fd);
@@ -235,15 +172,4 @@ void usage()
 	printf("Usage: rpmsg_char_simple [-n <num_msgs>] [-s <msg_size>] \n");
 	printf("\t\tDefaults: num_msgs: %d msg_size: %d\n", NUM_ITERATIONS_DEFAULT,
 	       MSG_SIZE_DEFAULT);
-}
-
-int check_payload(const char *sent, const char *recv, int packet_len)
-{
-	if (strncmp(sent, recv, packet_len) != 0) {
-		printf("Payloads do not match\n");
-		printf("Sent: %s\n", sent);
-		printf("Received: %s\n", recv);
-		return -1;
-	}
-	return 0;
 }
