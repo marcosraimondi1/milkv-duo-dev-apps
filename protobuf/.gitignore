@@ -1,0 +1,4 @@
+nanopb-*
+*.pb.*
+*.o
+proto_example
