@@ -3,6 +3,7 @@
 
 syntax = "proto2";
 
-message SimpleMessage {
-    required int32 lucky_number = 1;
+message SimpleMessage
+{
+	repeated int32 board = 1;
 }

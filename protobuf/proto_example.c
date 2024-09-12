@@ -1,7 +1,8 @@
 #include <stdio.h>
+#include <string.h>
 #include "pb_encode.h"
 #include "pb_decode.h"
-#include "message.pb.h"
+#include "message.pb.h" // Include the generated header file
 
 int main()
 {
@@ -12,56 +13,56 @@ int main()
 
 	/* Encode our message */
 	{
-		/* Allocate space on the stack to store the message data.
-		 *
-		 * Nanopb generates simple struct definitions for all the messages.
-		 * - check out the contents of simple.pb.h!
-		 * It is a good idea to always initialize your structures
-		 * so that you do not have garbage data from RAM in there.
-		 */
+		/* Initialize the message structure to zero */
 		SimpleMessage message = SimpleMessage_init_zero;
 
-		/* Create a stream that will write to our buffer. */
+		/* Set the values of the array */
+		int32_t board_data[] = {1, 2, 3, 4, 5};
+		size_t board_size = sizeof(board_data) / sizeof(board_data[0]);
+
+		/* Copy the data to the message */
+		memcpy(message.board, board_data, board_size * sizeof(int32_t));
+		message.board_count = board_size; // Set the actual number of elements
+
+		/* Create a stream that will write to our buffer */
 		pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
 
-		/* Fill in the lucky number */
-		message.lucky_number = 13;
-
-		/* Now we are ready to encode the message! */
+		/* Encode the message */
 		status = pb_encode(&stream, SimpleMessage_fields, &message);
 		message_length = stream.bytes_written;
 
-		/* Then just check for any errors.. */
+		/* Check for encoding errors */
 		if (!status) {
 			printf("Encoding failed: %s\n", PB_GET_ERROR(&stream));
 			return 1;
 		}
+		printf("Message encoded successfully!\n");
 	}
 
-	/* Now we could transmit the message over network, store it in a file or
-	 * wrap it to a pigeon's leg.
-	 */
+	printf("Encoded message length: %zu\n", message_length);
 
-	/* But because we are lazy, we will just decode it immediately. */
-
+	/* Decode the message */
 	{
-		/* Allocate space for the decoded message. */
+		/* Initialize the message structure to zero */
 		SimpleMessage message = SimpleMessage_init_zero;
 
-		/* Create a stream that reads from the buffer. */
+		/* Create a stream that reads from the buffer */
 		pb_istream_t stream = pb_istream_from_buffer(buffer, message_length);
 
-		/* Now we are ready to decode the message. */
+		/* Decode the message */
 		status = pb_decode(&stream, SimpleMessage_fields, &message);
 
-		/* Check for errors... */
+		/* Check for decoding errors */
 		if (!status) {
 			printf("Decoding failed: %s\n", PB_GET_ERROR(&stream));
 			return 1;
 		}
 
-		/* Print the data contained in the message. */
-		printf("Your lucky number was %d!\n", (int)message.lucky_number);
+		/* Print the decoded data */
+		printf("Decoded message contains %hu elements:\n", message.board_count);
+		for (size_t i = 0; i < message.board_count; ++i) {
+			printf("Element %zu: %d\n", i, message.board[i]);
+		}
 	}
 
 	return 0;
