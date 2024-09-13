@@ -14,23 +14,27 @@ endif
 
 CC = $(TOOLCHAIN_PREFIX)gcc
 
-CFLAGS += -I$(SYSROOT)/usr/include
+OUTPUT_DIR = out
+SOURCE_DIR = src
+INCLUDE_DIR = include
+
+CFLAGS += -I$(SYSROOT)/usr/include -I$(INCLUDE_DIR)
 
 LDFLAGS += -L$(SYSROOT)/lib
 LDFLAGS += -L$(SYSROOT)/usr/lib
 
-SOURCE = $(wildcard *.c)
-OBJS = $(patsubst %.c,%.o,$(SOURCE))
+SOURCE = $(wildcard $(SOURCE_DIR)/*.c)
+OBJS = $(patsubst $(SOURCE_DIR)/%.c,$(OUTPUT_DIR)/%.o,$(SOURCE))
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
 
-%.o: %.c
+$(OUTPUT_DIR)/%.o: $(SOURCE_DIR)/%.c
+	@mkdir -p $(OUTPUT_DIR)
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 .PHONY: clean
 clean:
-	@rm *.o -rf
-	@rm $(OBJS) -rf
-	@rm $(TARGET)
+	@rm $(TARGET) -f
+	@rm $(OUTPUT_DIR) -rf
 
