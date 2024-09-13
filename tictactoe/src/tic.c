@@ -1,5 +1,6 @@
 #include "comms.h"
 #include "minimax.h"
+#include "encoding.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -8,6 +9,7 @@ int user_turn;
 int machine_vs_machine = 0;
 char BOARD[3][3];
 char play_marker;
+uint8_t buffer[128];
 
 void setup(void);
 void loop(void);
@@ -108,29 +110,29 @@ void loop()
 	}
 }
 
+int encoded_size = 0;
 int send_board(char board[3][3])
 {
-	char board_to_send[9] = {0};
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 3; j++) {
-			board_to_send[i * 3 + j] = BOARD[i][j];
-		}
+	encoded_size = encode_board(BOARD, buffer, sizeof(buffer));
+
+	if (encoded_size < 0) {
+		printf("encode_board failed\n");
+		return -1;
 	}
 
-	return send_msg(board_to_send, sizeof(board_to_send));
+	return send_msg(buffer, encoded_size);
 }
 
 int recv_board(char board[3][3])
 {
-	char board_recv[9] = {0};
+	int ret = recv_msg(buffer, encoded_size);
 
-	int ret = recv_msg(board_recv, sizeof(board_recv));
-
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 3; j++) {
-			BOARD[i][j] = board_recv[i * 3 + j];
-		}
+	if (ret < 0) {
+		printf("recv_msg failed\n");
+		return -1;
 	}
+
+	ret = decode_board(BOARD, buffer);
 
 	return ret;
 }
