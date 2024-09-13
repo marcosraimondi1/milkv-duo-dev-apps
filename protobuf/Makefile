@@ -12,25 +12,29 @@ ifeq (,$(LDFLAGS))
 $(error LDFLAGS is not set)
 endif
 
+INCLUDE_DIR = include
+SOURCE_DIR = src
+OUTPUT_DIR = out
+
 CC = $(TOOLCHAIN_PREFIX)gcc
 
-CFLAGS += -I$(SYSROOT)/usr/include
+CFLAGS += -I$(SYSROOT)/usr/include -I$(INCLUDE_DIR)
 
 LDFLAGS += -L$(SYSROOT)/lib
 LDFLAGS += -L$(SYSROOT)/usr/lib
 
-SOURCE = $(wildcard *.c)
-OBJS = $(patsubst %.c,%.o,$(SOURCE))
+SOURCE = $(wildcard $(SOURCE_DIR)/*.c)
+OBJS = $(patsubst $(SOURCE_DIR)/%.c,$(OUTPUT_DIR)/%.o,$(SOURCE))
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
 
-%.o: %.c
+$(OUTPUT_DIR)/%.o: $(SOURCE_DIR)/%.c
+	@mkdir -p $(OUTPUT_DIR) 
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 .PHONY: clean
 clean:
-	@rm *.o -rf
-	@rm $(OBJS) -rf
+	@rm -rf $(OUTPUT_DIR)
 	@rm $(TARGET)
 

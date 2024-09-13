@@ -1,4 +1,4 @@
-nanopb-*
-*.pb.*
-*.o
+nanopb
 proto_example
+out
+compile_commands.json
