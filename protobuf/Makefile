@@ -1,16 +1,16 @@
 TARGET=proto_example
 
-ifeq (,$(TOOLCHAIN_PREFIX))
-$(error TOOLCHAIN_PREFIX is not set)
-endif
-
-ifeq (,$(CFLAGS))
-$(error CFLAGS is not set)
-endif
-
-ifeq (,$(LDFLAGS))
-$(error LDFLAGS is not set)
-endif
+# ifeq (,$(TOOLCHAIN_PREFIX))
+# $(error TOOLCHAIN_PREFIX is not set)
+# endif
+#
+# ifeq (,$(CFLAGS))
+# $(error CFLAGS is not set)
+# endif
+#
+# ifeq (,$(LDFLAGS))
+# $(error LDFLAGS is not set)
+# endif
 
 INCLUDE_DIR = include
 SOURCE_DIR = src

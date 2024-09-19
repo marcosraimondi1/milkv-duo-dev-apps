@@ -3,3 +3,6 @@ proto_example
 out
 compile_commands.json
 .cache
+__pycache__
+c_encoded
+python_encoded

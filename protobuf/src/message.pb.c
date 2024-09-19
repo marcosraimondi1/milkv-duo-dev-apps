@@ -6,7 +6,11 @@
 #error Regenerate this file with the current version of nanopb generator.
 #endif
 
-PB_BIND(SimpleMessage, SimpleMessage, AUTO)
+PB_BIND(Board, Board, AUTO)
+
+
+PB_BIND(Board_Row, Board_Row, AUTO)
+
 
 
 
