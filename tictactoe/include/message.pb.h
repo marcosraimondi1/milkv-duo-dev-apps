@@ -9,38 +9,71 @@
 #error Regenerate this file with the current version of nanopb generator.
 #endif
 
+/* Enum definitions */
+typedef enum _Board_Mark {
+    Board_Mark_MARK_EMPTY = 0,
+    Board_Mark_MARK_X = 1,
+    Board_Mark_MARK_O = 2
+} Board_Mark;
+
 /* Struct definitions */
-typedef struct _SimpleMessage {
-    pb_size_t board_count;
-    int32_t board[10];
-} SimpleMessage;
+typedef struct _Board_Row {
+    pb_size_t marks_count;
+    Board_Mark marks[3];
+} Board_Row;
+
+typedef struct _Board {
+    pb_size_t rows_count;
+    Board_Row rows[3];
+} Board;
 
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/* Helper constants for enums */
+#define _Board_Mark_MIN Board_Mark_MARK_EMPTY
+#define _Board_Mark_MAX Board_Mark_MARK_O
+#define _Board_Mark_ARRAYSIZE ((Board_Mark)(Board_Mark_MARK_O+1))
+
+
+#define Board_Row_marks_ENUMTYPE Board_Mark
+
+
 /* Initializer values for message structs */
-#define SimpleMessage_init_default               {0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}
-#define SimpleMessage_init_zero                  {0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}
+#define Board_init_default                       {0, {Board_Row_init_default, Board_Row_init_default, Board_Row_init_default}}
+#define Board_Row_init_default                   {0, {_Board_Mark_MIN, _Board_Mark_MIN, _Board_Mark_MIN}}
+#define Board_init_zero                          {0, {Board_Row_init_zero, Board_Row_init_zero, Board_Row_init_zero}}
+#define Board_Row_init_zero                      {0, {_Board_Mark_MIN, _Board_Mark_MIN, _Board_Mark_MIN}}
 
 /* Field tags (for use in manual encoding/decoding) */
-#define SimpleMessage_board_tag                  1
+#define Board_Row_marks_tag                      1
+#define Board_rows_tag                           1
 
 /* Struct field encoding specification for nanopb */
-#define SimpleMessage_FIELDLIST(X, a) \
-X(a, STATIC,   REPEATED, INT32,    board,             1)
-#define SimpleMessage_CALLBACK NULL
-#define SimpleMessage_DEFAULT NULL
+#define Board_FIELDLIST(X, a) \
+X(a, STATIC,   REPEATED, MESSAGE,  rows,              1)
+#define Board_CALLBACK NULL
+#define Board_DEFAULT NULL
+#define Board_rows_MSGTYPE Board_Row
 
-extern const pb_msgdesc_t SimpleMessage_msg;
+#define Board_Row_FIELDLIST(X, a) \
+X(a, STATIC,   REPEATED, UENUM,    marks,             1)
+#define Board_Row_CALLBACK NULL
+#define Board_Row_DEFAULT NULL
+
+extern const pb_msgdesc_t Board_msg;
+extern const pb_msgdesc_t Board_Row_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
-#define SimpleMessage_fields &SimpleMessage_msg
+#define Board_fields &Board_msg
+#define Board_Row_fields &Board_Row_msg
 
 /* Maximum encoded size of messages (where known) */
-#define MESSAGE_PB_H_MAX_SIZE                    SimpleMessage_size
-#define SimpleMessage_size                       110
+#define Board_Row_size                           6
+#define Board_size                               24
+#define MESSAGE_PB_H_MAX_SIZE                    Board_size
 
 #ifdef __cplusplus
 } /* extern "C" */

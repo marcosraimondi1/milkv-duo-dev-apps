@@ -132,7 +132,7 @@ int recv_board(char board[3][3])
 		return -1;
 	}
 
-	ret = decode_board(BOARD, buffer);
+	ret = decode_board(BOARD, buffer, encoded_size);
 
 	return ret;
 }
