@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# Starts thttpd.
+#
+
+start() {
+	printf "Starting thttpd web server: "
+
+	/usr/bin/thttpd -C /etc/thttpd.conf
+
+}
+stop() {
+	printf "Stopping thttpd web server: "
+	killall thttpd
+}
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+  start)
+  	start
+	;;
+  stop)
+  	stop
+	;;
+  restart|reload)
+  	restart
+	;;
+  *)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?
