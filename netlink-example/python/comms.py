@@ -1,7 +1,9 @@
 import os
 import socket
 import struct
-import ctypes
+
+# constants
+NLMSG_HDRLEN = 16 # header length
 
 # types
 NLMSG_NOOP = 1
@@ -19,32 +21,14 @@ NLM_F_ACK = 4
 NLM_F_ECHO = 8
 
 class Message:
-    def __init__(self, msg_type, flags=0, seq=-1, payload=None):
+    def __init__(self, msg_type=NLMSG_DONE, flags=0, seq=-1, payload=None):
         self.type = msg_type
         self.flags = flags
         self.seq = seq
         self.pid = 1
-        payload = payload or []
-        if isinstance(payload, list):
-            contents = []
-            for attr in payload:
-                contents.append(attr._dump())
-            self.payload = b''.join(contents)
-        else:
-            self.payload = payload
+        payload = payload or bytes()
+        self.payload = payload
 
-    def send(self, conn):
-        if self.seq == -1:
-            self.seq = conn.seq()
-
-        self.pid = conn.pid
-        length = len(self.payload)
-
-        hdr = struct.pack("IHHII", length + 4 * 4, self.type,
-                          self.flags, self.seq, self.pid)
-        conn.send(hdr + bytes(self.payload, 'utf-8'))
-
- 
 class Connection(object):
     """
     Object representing Netlink socket connection to the kernel.
@@ -68,19 +52,19 @@ class Connection(object):
             length = len(msg.payload)
             hdr = struct.pack("IHHII", length + 4 * 4, msg.type,
                           msg.flags, msg.seq, msg.pid) 
-            msg = hdr + msg.payload.encode('utf-8')
+
+            msg = hdr + msg.payload
+
             return self.fd.send(msg)
      
     def recve(self):
-        #data, (nlpid, nlgrps) =  self.fd.recvfrom(16384)
         data = self.fd.recv(16384)
-        msglen, msg_type, flags, seq, pid = struct.unpack("IHHII", data[:16])
-        msg = Message(msg_type, flags, seq, data[16:])
+        _, msg_type, flags, seq, pid = struct.unpack("IHHII", data[:NLMSG_HDRLEN])
+        nlh_len = struct.unpack("I", data[0:4])[0]
+
+        msg = Message(msg_type, flags, seq, data[NLMSG_HDRLEN:nlh_len])
+
         msg.pid = pid
-        if msg_type == NLMSG_DONE:
-           print("payload :", msg.payload)
-           print("msg.pid :", msg.pid)
-           print("msg.seq :", msg.seq)
         if msg.type == NLMSG_ERROR:
             errno = -struct.unpack("i", msg.payload[:4])[0]
             if errno != 0:
@@ -90,29 +74,9 @@ class Connection(object):
                 print("err :",err)
                 raise err
         
-        #return msg.payload 
-        return msg 
+        return msg.payload 
         
     def seq(self):
         self._seq += 1
         return self._seq
 
-
-sock = Connection(nlservice=17)
-
-var = "hello world"
-msg1 = Message(NLMSG_DONE,0,-1,var) 
-print("pid of sock :", sock.pid)
-print ("seq number of sock :",sock._seq)
-
-#res1 = msg1.send(sock)
-res1 = sock.send(msg1)
-print("pid of the message send to kernel: ", msg1.pid)
-print("seq number of the message send to kernel : ", msg1.seq)
-
-print("return of send ", res1)
-
-print("waiting for kernel ..")
-#msgreply = sock.fd.recvmsg(16384)
-res2 = sock.recve()
-print("return of recive ", res2)
