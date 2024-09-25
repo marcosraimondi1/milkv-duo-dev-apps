@@ -43,6 +43,8 @@ int main()
 	uint8_t buffer2[128];
 	size_t message_length2 = fread(buffer2, 1, sizeof(buffer2), f2);
 
+	printf("Read %zu bytes from python\n", message_length2);
+
 	char board_decoded2[3][3] = {0};
 	status = decode_board(board_decoded2, buffer2, message_length2);
 	if (status < 0) {
@@ -57,6 +59,9 @@ int main()
 		}
 		printf("\n");
 	}
+
+	message_length = encode_board(board_decoded2, buffer2, sizeof(buffer2));
+	printf("Encoded python message to %d bytes\n", message_length);
 
 	return 0;
 }
