@@ -1,6 +1,7 @@
 from encoding import encode_board, decode_board
 from comms import Connection, Message
 import tictactoe as ttt
+import time
 
 sock = Connection(nlservice=18)
 
@@ -14,6 +15,7 @@ def receive_board():
     return decode_board(encoded)
 
 user = None
+auto = False
 board = ttt.initial_state()
 ai_turn = False
 
@@ -27,11 +29,13 @@ while True:
         # Draw title
         print("Play Tic-Tac-Toe")
 
+        auto = input("Auto mode? (y/n): ") == "y"
+
         while user is None:
             option = input("Choose X or O: ")
-            if option == "X":
+            if option.upper() == "X":
                 user = ttt.X
-            elif option == "O":
+            elif option.upper() == "O":
                 user = ttt.O
 
     else:
@@ -64,10 +68,10 @@ while True:
         # Check for AI move
         if user != player and not game_over:
             if ai_turn:
+                if (auto):
+                    time.sleep(1)
                 send_board(board) # Send board to AI
                 board = receive_board() # Receive board from AI
-                # move = ttt.minimax(board)
-                # board = ttt.result(board, move)
                 ai_turn = False
             else:
                 ai_turn = True
@@ -75,18 +79,23 @@ while True:
         # Check for a user move
         if user == player and not game_over:
             move = None
-            while move is None:
-                move = input("Enter move (row col): ").split(" ")
-                try:
-                    move = (int(move[0]), int(move[1]))
-                    if board[move[0]][move[1]] != ttt.EMPTY:
+            if auto:
+                # Auto mode
+                time.sleep(1)
+                move = ttt.minimax(board)
+            else:
+                while move is None:
+                    move = input("Enter move (row col): ").split(" ")
+                    try:
+                        move = (int(move[0]), int(move[1]))
+                        if board[move[0]][move[1]] != ttt.EMPTY:
+                            move = None
+                            print("Invalid move.")
+                    except:
                         move = None
                         print("Invalid move.")
-                except:
-                    move = None
-                    print("Invalid move.")
 
-            board = ttt.result(board, (move[0], move[1]))
+            board = ttt.result(board, move)
 
         if game_over:
             exit()
