@@ -1,6 +1,9 @@
 #!/bin/sh
 
 echo "install thttpd..."
+
+mkdir -p /var/www
+
 cp -a bin/* /usr/bin
 cp -a etc/* /etc
 cp -r -a www/* /var/www

@@ -2,9 +2,14 @@
 echo "Content-type: text/html"
 echo ""
 
+current=$(cat /sys/class/remoteproc/remoteproc0/firmware)
+
 for file in /lib/firmware/*.elf; do
-	# return filename
-	echo "<option value=\"$(basename $file)\">$(basename $file)</option>"
+        if [ $current ==  $(basename $file) ]; then
+                echo "<option value=\"$(basename $file)\" selected>$(basename $file)</option>"
+        else
+                echo "<option value=\"$(basename $file)\">$(basename $file)</option>"
+        fi
 done
 
 echo "<option value=\"stop\">stop</option>"
