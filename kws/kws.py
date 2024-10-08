@@ -12,8 +12,10 @@ def receive_msg():
     encoded = sock.recve()
     return decode_msg(encoded)
 
+# register pid in module
+send_msg()
 
 while True:
-    send_msg()
+    print("trying to receive")
     receive_msg()
-    time.sleep(5)
+    time.sleep(1)
