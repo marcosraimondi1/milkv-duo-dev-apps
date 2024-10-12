@@ -19,9 +19,6 @@ else
 fi
 echo "</pre>"
 
-echo "<h3>Remote Firmware</h3>"
-echo "<pre>State: $(cat /sys/class/remoteproc/remoteproc0/state)</pre>"
-echo "<pre>Firmware: $(cat /sys/class/remoteproc/remoteproc0/firmware)</pre>"
 
 echo "<h3>UPTIME</h3>"
 echo "<pre>"
@@ -37,7 +34,7 @@ free -h
 echo "</pre>"
 echo "<h3>TOP</h3>"
 echo "<pre>"
-top -bn1 | head -n 15
+top -bn1 | head -n 10
 echo "</pre>"
 
 

@@ -16,8 +16,21 @@ window.addEventListener("load", function () {
 
   getRemoteFirmwares();
   getStats();
+  getRPMsg();
   setInterval(getStats, 1000); // Actualiza cada 1 segundo
+  setInterval(getRPMsg, 1000); // Actualiza cada 1 segundo
 });
+
+function getRPMsg() {
+  var xhr = new XMLHttpRequest();
+  xhr.onreadystatechange = function () {
+    if (xhr.readyState == 4 && xhr.status == 200) {
+      document.getElementById("rpmsg").innerHTML = xhr.responseText;
+    }
+  };
+  xhr.open("GET", "cgi-bin/get_rpmsg.cgi", true);
+  xhr.send();
+}
 
 function toggleLED() {
   var xhr = new XMLHttpRequest();

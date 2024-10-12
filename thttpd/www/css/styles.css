@@ -1,13 +1,13 @@
 body {
     font-size: 18px;
     font-family: Arial, sans-serif;
-    background-color: #f0f0f0;
-    margin: 0;
+    background-color: #e6e2d3;
+    margin: 20px;
     padding: 0;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    height: 100%;
     text-align: center;
 }
 
@@ -22,7 +22,16 @@ body {
 }
 
 h1 {
-    color: #333;
+    color: #b9936c;
+}
+
+h2, h3 {
+    color: #6d6358;
+}
+
+h3 {
+    color: #3a3734;
+    text-align: left;
 }
 
 button,select {
@@ -36,4 +45,5 @@ pre {
     justify-content: left;
     align-items: left;
     text-align: left;
+    padding-left: 20px;
 }
