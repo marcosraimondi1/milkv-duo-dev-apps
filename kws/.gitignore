@@ -1,0 +1,8 @@
+nanopb
+proto_decoder
+out
+compile_commands.json
+.cache
+__pycache__
+c_encoded
+python_encoded
