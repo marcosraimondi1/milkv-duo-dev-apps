@@ -11,5 +11,3 @@ for file in /lib/firmware/*.elf; do
                 echo "<option value=\"$(basename $file)\">$(basename $file)</option>"
         fi
 done
-
-echo "<option value=\"stop\">stop</option>"

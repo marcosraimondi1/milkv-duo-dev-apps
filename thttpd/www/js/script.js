@@ -1,18 +1,21 @@
 window.addEventListener("load", function () {
-  document.getElementById("myButton").addEventListener("click", function () {
+  const myButton = document.getElementById("myButton");
+  const stopRemote = document.getElementById("stop-remote");
+  const startRemote = document.getElementById("start-remote");
+  const remoteFirmware = document.getElementById("remote-firmware");
+
+  myButton.addEventListener("click", function () {
     toggleLED();
   });
 
-  document
-    .getElementById("remote-firmware")
-    .addEventListener("change", function () {
-      const value = this.value;
-      if (value == "stop") {
-        stopRemoteFirmware();
-        return;
-      }
-      startRemoteFirmware(value);
-    });
+  stopRemote.addEventListener("click", function () {
+    stopRemoteFirmware();
+  });
+
+  startRemote.addEventListener("click", function () {
+    const value = remoteFirmware.value;
+    startRemoteFirmware(value);
+  });
 
   getRemoteFirmwares();
   getStats();
@@ -83,8 +86,8 @@ function startRemoteFirmware(firmware) {
 function stopRemoteFirmware() {
   var xhr = new XMLHttpRequest();
   xhr.onreadystatechange = function () {
-    if (xhr.readyState == 4 && xhr.status == 200) {
-      alert("response: " + xhr.responseText);
+    if (xhr.readyState == 4 && xhr.status != 200) {
+      alert("failed to stop remote firmware");
     }
   };
   xhr.open("GET", "cgi-bin/stop_remote_firmware.cgi", true);
