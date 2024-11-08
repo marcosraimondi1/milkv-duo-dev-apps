@@ -1,0 +1,86 @@
+#include <stdio.h>
+#include "encoding.h"
+
+int main(int argc, char *argv[])
+{
+	if (argc != 3) {
+		printf("Usage: %s <file> <move>\n", argv[0]);
+		return 1;
+	}
+
+	char board[3][3];
+	uint8_t buffer[128];
+
+	// read encoded message from file
+	FILE *file = fopen(argv[1], "rb");
+	if (!file) {
+		return 0;
+	}
+	size_t message_length = fread(buffer, 1, sizeof(buffer), file);
+	fclose(file);
+
+	int status = decode_board(board, buffer, message_length);
+
+	if (status < 0) {
+		printf("Decoding failed\n");
+		return 1;
+	}
+
+	if (strlen(argv[2]) != 2) {
+		printf("Invalid move\n");
+		return 1;
+	}
+
+	int ended = 1;
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			if (board[i][j] == ' ') {
+				ended = 0;
+				break;
+			}
+		}
+		if (!ended) {
+			break;
+		}
+	}
+
+	if (ended) {
+		// restart
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 3; j++) {
+				board[i][j] = ' ';
+			}
+		}
+	}
+
+	int row = argv[2][0] - '0';
+	int col = argv[2][1] - '0';
+
+	if (row < 0 || row >= 3 || col < 0 || col >= 3) {
+		printf("Invalid move\n");
+		return 1;
+	}
+
+	if (board[row][col] != ' ') {
+		printf("Invalid move\n");
+		return 1;
+	}
+
+	board[row][col] = 'X';
+
+	size_t encoded_length = encode_board(board, buffer, sizeof(buffer));
+	if (encoded_length <= 0) {
+		printf("Encoding failed\n");
+		return 1;
+	}
+
+	file = fopen(argv[1], "w+");
+	if (!file) {
+		return 0;
+	}
+
+	fwrite(buffer, 1, encoded_length, file);
+	fclose(file);
+
+	return 0;
+}
