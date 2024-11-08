@@ -1,56 +1,57 @@
 body {
-    font-size: 18px;
-    font-family: Arial, sans-serif;
-    background-color: #e6e2d3;
-    margin: 20px;
-    padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
-    text-align: center;
+	font-size: 18px;
+	font-family: Arial, sans-serif;
+	background-color: #e6e2d3;
+	margin: 20px;
+	padding: 0;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: 100%;
+	text-align: center;
 }
 
 #main-container {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-around;
-    align-items: center;
-    text-align: center;
-    width: 100%;
-    flex-wrap: wrap;
+	display: flex;
+	flex-direction: row;
+	justify-content: space-around;
+	align-items: center;
+	text-align: center;
+	width: 100%;
+	flex-wrap: wrap;
 }
 
 h1 {
-    color: #b9936c;
+	color: #b9936c;
 }
 
 h2, h3 {
-    color: #6d6358;
+	color: #6d6358;
 }
 
 h3 {
-    color: #3a3734;
-    text-align: left;
+	color: #3a3734;
+	text-align: left;
 }
 
-button,select {
-    padding: 10px 20px;
-    font-size: 18px;
-    cursor: pointer;
-    background-color: #f0f0f0;
-    border-color: #b9936c;
-    border-width: 2px;
+button,select,input {
+	padding: 10px 20px;
+	font-size: 18px;
+	cursor: pointer;
+	background-color: #f0f0f0;
+	border-color: #b9936c;
+	border-width: 2px;
 }
 
 button:hover {
-    background-color: #e7be93;
-    border-color: #b9936c;
+	background-color: #e7be93;
+	border-color: #b9936c;
 }
 
 pre {
-    justify-content: left;
-    align-items: left;
-    text-align: left;
-    padding-left: 20px;
+	justify-content: left;
+	align-items: left;
+	text-align: left;
+	padding-left: 20px;
 }
+

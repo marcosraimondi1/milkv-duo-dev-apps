@@ -31,8 +31,17 @@ else
   if [ $state == "running" ]; then
     echo -n stop > /sys/class/remoteproc/remoteproc0/state
   fi
- 
+
   echo -n "$firmware" > /sys/class/remoteproc/remoteproc0/firmware
   echo -n start > /sys/class/remoteproc/remoteproc0/state
   dmesg
+
+  sleep 1
+
+  echo "" > last_msg.txt
+
+  if [ $firmware == "openamp_tty.elf" ]
+  then
+	nohup cat /dev/ttyRPMSG0 &>tty.txt &
+  fi
 fi

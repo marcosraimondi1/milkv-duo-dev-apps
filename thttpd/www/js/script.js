@@ -3,6 +3,13 @@ window.addEventListener("load", function () {
   const stopRemote = document.getElementById("stop-remote");
   const startRemote = document.getElementById("start-remote");
   const remoteFirmware = document.getElementById("remote-firmware");
+  const sendRpmsgInput = document.getElementById("rpmsg-input");
+  const sendRpmsgButton = document.getElementById("send-rpmsg-button");
+  sendRpmsgButton.addEventListener("click", function () {
+    const msg = sendRpmsgInput.value;
+    sendRpmsgInput.value = "";
+    sendRPMSG(msg);
+  });
 
   myButton.addEventListener("click", function () {
     toggleLED();
@@ -20,8 +27,8 @@ window.addEventListener("load", function () {
   getRemoteFirmwares();
   getStats();
   getRPMsg();
-  setInterval(getStats, 1000); // Actualiza cada 1 segundo
-  setInterval(getRPMsg, 1000); // Actualiza cada 1 segundo
+  setInterval(getStats, 500); // Actualiza cada 1 segundo
+  setInterval(getRPMsg, 500); // Actualiza cada 1 segundo
 });
 
 function getRPMsg() {
@@ -29,9 +36,39 @@ function getRPMsg() {
   xhr.onreadystatechange = function () {
     if (xhr.readyState == 4 && xhr.status == 200) {
       document.getElementById("rpmsg").innerHTML = xhr.responseText;
+
+      let currentFirmware = document.getElementById("firmware").innerText;
+      if (
+        currentFirmware == "tictactoe.elf" ||
+        currentFirmware == "openamp_tty.elf"
+      ) {
+        document.getElementById("send-rpmsg").style.display = "";
+      } else {
+        document.getElementById("send-rpmsg").style.display = "none";
+      }
     }
   };
   xhr.open("GET", "cgi-bin/get_rpmsg.cgi", true);
+  xhr.send();
+}
+
+function sendRPMSG(msg) {
+  if (!msg) {
+    alert("No message to send");
+    return;
+  }
+
+  const sendRpmsgButton = document.getElementById("send-rpmsg-button");
+  sendRpmsgButton.disabled = true;
+
+  var xhr = new XMLHttpRequest();
+  xhr.onreadystatechange = function () {
+    if (xhr.readyState == 4 && xhr.status == 200) {
+      console.log("sendRPMSG: " + xhr.responseText);
+    }
+    sendRpmsgButton.disabled = false;
+  };
+  xhr.open("GET", "cgi-bin/send_rpmsg.cgi?msg=" + msg, true);
   xhr.send();
 }
 
