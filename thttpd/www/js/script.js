@@ -76,7 +76,7 @@ function toggleLED() {
   var xhr = new XMLHttpRequest();
   xhr.onreadystatechange = function () {
     if (xhr.readyState == 4 && xhr.status == 200) {
-      alert("response: " + xhr.responseText);
+      console.log("response: " + xhr.responseText);
     }
   };
   xhr.open("GET", "cgi-bin/toggle_led.cgi", true);

@@ -27,8 +27,14 @@ int main(int argc, char *argv[])
 	printf("DSP: %d ms, Classification: %d ms\n", result.timing.dsp,
 	       result.timing.classification);
 	for (int i = 0; i < 3; i++) {
-		printf("%s: %.2f %%\n", result.predictions[i].label,
-		       100.0 * result.predictions[i].value);
+		double percentage = 100.0 * result.predictions[i].value;
+
+		if (percentage >= 75) {
+			printf("<b>%s: %.2f %%</b>\n", result.predictions[i].label, percentage);
+
+		} else {
+			printf("%s: %.2f %%\n", result.predictions[i].label, percentage);
+		}
 	}
 
 	return 0;

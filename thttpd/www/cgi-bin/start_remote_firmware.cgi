@@ -20,6 +20,9 @@ get_firmware_param() {
   echo "$firmware_value"
 }
 
+/sbin/rmmod kws_mod > /dev/null 2>&1
+/sbin/rmmod tictactoe_mod > /dev/null 2>&1
+
 firmware=$(get_firmware_param "$QUERY_STRING")
 
 if [ -z "$firmware" ]; then
@@ -43,5 +46,15 @@ else
   if [ $firmware == "openamp_tty.elf" ]
   then
 	nohup cat /dev/ttyRPMSG0 &>tty.txt &
+  fi
+
+  if [ $firmware == "tictactoe.elf" ]
+  then
+        /sbin/insmod /root/modules/tictactoe_mod.ko
+  fi
+
+  if [ $firmware == "kws.elf" ]
+  then
+        /sbin/insmod /root/modules/kws_mod.ko
   fi
 fi
