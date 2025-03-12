@@ -1,6 +1,8 @@
-# Unicast Example
+# Netlink Communication Unicast Example
 
-Example adapted to newer Linux kernel versions.
+This application shows an example of communication between Linux kernel space and user space.
+
+## Build
 
 Compile kernel module and user space program.
 
